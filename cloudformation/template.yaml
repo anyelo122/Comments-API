@@ -1,0 +1,204 @@
+Resources:
+  # DynamoDB Table for storing comments
+  CommentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "Comments"
+      AttributeDefinitions:
+        - AttributeName: "commentId"
+          AttributeType: "S" 
+      KeySchema:
+        - AttributeName: "commentId"
+          KeyType: "HASH"  
+      BillingMode: PAY_PER_REQUEST  
+
+  # IAM Role for the Lambda function to allow access to DynamoDB
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaDynamoDBPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt CommentsTable.Arn
+
+  # Lambda function for creating a comment
+  CreateCommentLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "CreateComment"
+      Handler: "createComment.handler"
+      Runtime: nodejs18.x
+      Code:
+        S3Bucket: "my-bucket"  
+        S3Key: "lambda/createComment.zip"  
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: "Comments"
+
+  # Lambda function for updating a comment
+  UpdateCommentLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "UpdateComment"
+      Handler: "updateComment.handler"
+      Runtime: nodejs18.x
+      Code:
+        S3Bucket: "my-bucket"
+        S3Key: "lambda/updateComment.zip"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: "Comments"
+
+  # Lambda function for deleting a comment
+  DeleteCommentLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "DeleteComment"
+      Handler: "deleteComment.handler"
+      Runtime: nodejs18.x
+      Code:
+        S3Bucket: "my-bucket"
+        S3Key: "lambda/deleteComment.zip"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: "Comments"
+
+  # Lambda function for retrieving a single comment by ID
+  GetCommentByIdLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "GetCommentById"
+      Handler: "getCommentById.handler"
+      Runtime: nodejs18.x
+      Code:
+        S3Bucket: "my-bucket"
+        S3Key: "lambda/getCommentById.zip"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: "Comments"
+
+  # Lambda function for retrieving all comments
+  GetAllCommentsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "GetAllComments"
+      Handler: "getAllComments.handler"
+      Runtime: nodejs18.x
+      Code:
+        S3Bucket: "my-bucket"
+        S3Key: "lambda/getAllComments.zip"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: "Comments"
+
+  # API Gateway HTTP API to expose the Lambda functions
+  CommentsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: "CommentsAPI"
+      ProtocolType: "HTTP"  
+
+  # Integrations for API Gateway and Lambda functions
+  CreateCommentIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CommentsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt CreateCommentLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  UpdateCommentIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CommentsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt UpdateCommentLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  DeleteCommentIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CommentsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt DeleteCommentLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  GetCommentByIdIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CommentsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GetCommentByIdLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  GetAllCommentsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CommentsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GetAllCommentsLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  # Routes for the HTTP API
+  CreateCommentRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CommentsApi
+      RouteKey: "POST /comments"
+      Target: !Join [ "/", ["integrations", !Ref CreateCommentIntegration] ]
+
+  UpdateCommentRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CommentsApi
+      RouteKey: "PUT /comments/{commentId}"
+      Target: !Join [ "/", ["integrations", !Ref UpdateCommentIntegration] ]
+
+  DeleteCommentRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CommentsApi
+      RouteKey: "DELETE /comments/{commentId}"
+      Target: !Join [ "/", ["integrations", !Ref DeleteCommentIntegration] ]
+
+  GetCommentByIdRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CommentsApi
+      RouteKey: "GET /comments/{commentId}"
+      Target: !Join [ "/", ["integrations", !Ref GetCommentByIdIntegration] ]
+
+  GetAllCommentsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CommentsApi
+      RouteKey: "GET /comments"
+      Target: !Join [ "/", ["integrations", !Ref GetAllCommentsIntegration] ]
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref CommentsApi
+      StageName: "dev"
+      AutoDeploy: true

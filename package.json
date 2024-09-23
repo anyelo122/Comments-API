@@ -1,0 +1,9 @@
+{
+  "name": "comments-lambda",
+  "version": "1.0.0",
+  "description": "Lambda functions for managing comments",
+  "main": "createComment.js",
+  "dependencies": {
+    "aws-sdk": "^2.814.0"
+  }
+}
